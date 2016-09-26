@@ -1,0 +1,140 @@
+Lagramge is an equation discovery method that is typically applied
+to the automated modeling task. We can define the task of automated
+modeling as: given measurements of the observed system variables
+X = (x1, x2, ..., xn), find a model that can accurately predict
+the measured values of the variables in X.
+
+In case of dynamic systems that change their state through time, the
+general task can be re-formulated as follows. Given measurements of
+the system variables X = (x1, x2, …, xn) through time, find ordinary
+differential equations (ODEs) dX/dt = f(X) that accurately predict
+the values of the system variables in X. dX/dt in the above formula
+denotes the first time derivative of X or, to put it simply,
+the change of X during a small time interval dt. To predict the values
+of the system variables through time, we need an algorithm for numerical
+simulation of ODEs that given the initial values of the system variables,
+infers the values of X in a given set of consecutive time points.
+
+In case of static systems, the task is similar, but this time we search
+for an algebraic equation xd = f(x1, x2, ..., x{d-1}, x{d+1}, ..., xn)
+that accurately predicts the values of the dependent variable xd.
+
+When approaching the task of automated modeling with machine learning
+(and equation discovery) methods, we have to select an inductive language
+bias for the function f, i.e., to decide what space of candidate equation
+structures will be considered by the method. Different automated modeling
+approaches select different language biases. While traditional system
+identification methods would assume that f is a linear function, Lagramge
+expects a specification of the space of function structures in the form
+of a grammar.
+
+
+1. How to write a grammar for Lagramge?
+
+A grammar to be used in Lagramge is an ordinary context free grammar
+with several constraints and special purpose symbols.
+
+Firt, the grammar has to generate proper arithmetical expressions that
+follow the syntax of arithmetical expressions in the C programming
+language. Thus, we can use: (1) standard C arithmetical operators, and
+(2) built-in, library, or user defined functions that return real 
+number (i.e., double) as terminal symbols in the grammar.
+
+Terminal grammar symbols with prefix "variable_" denote *individual*
+system variables. When we plan to run Lagramge on a data set with
+three variables x, y, z, we can use symbols variable_x, variable_y,
+and variable_z to refer to them in the grammar.
+
+Non-terminal gramar symbol V is a special purpose symbol that denotes
+*any* variable from the data set we run Lagramge on. We should not
+include any productions for V in the grammar. Lagramge, on the example
+above will automatically add the productions "V -> variable_x |
+variable_y | variable_z" to the grammar. Note however, that when we
+use Lagramge to induce *algebraic* equations for the z variable,
+production V -> variable_z is not added to the grammar (this is to
+avoid inducing the trivial equation z = z in the Lagramge search
+space).
+
+Terminal symbols of the form "const[name:lower:initial:upper]" denote
+constant parameters which values are to be fitted against data. The
+name is the name of the constant parameter (unnamed parameters are
+usually denoted by _), lower and upper denote the range of possible
+values of the parameter, while initial is the initial value used by
+parameter fitting method. For example, "const[_:0:1:1000]" denotes
+an unnamed constant parameter with a positive value <= 1000 with an
+initial/default value of 1.
+
+Directory ./examples/gramms/ includes example grammars.
+
+
+2. How to prepare a data set for Lagramge
+
+The first row in the data file contain the variable names, followed
+by ";". All the other lines define values of the variables. There is
+no default position of the dependent variable(s) in the table, this
+is specified in the command line used to invoke Lagramge. Similarly,
+there is no default position of the variable defining time (which is
+important when inducing differential equations).
+
+Directory ./examples/gramms/ includes example data sets.
+
+
+3. How to run Lagramge
+
+Assume that we want to use the linear grammar
+  ./examples/gramms/linear.gramm
+on the autoprice data set
+  ./examples/data/autoprice.data
+
+First, we have to prepare/compile the grammar:
+./bin/gc examples/gramms/linear.gramm
+
+In cases when Lagramge is properly installed and the grammar is
+correctly written, we get a response:
+
+Please use '-g linear.gramm' to run Lagramge using this grammar.
+
+In the next step, we can run Lagramge using:
+./bin/g -l linear.gramm -v price examples/data/autoprice.data
+
+which means that Lagramge exhaustively (default) searches the space of
+linear equations defining the value of the price variable and report
+25 top equations according the degree of fit against the training data
+(mean squared error, MSE, quantifies the degree of fit in Lagramge).
+If the run takes too long (it *does* take long), feel free to stop it
+using CTRL-C (or sending signal INT to the Lagramge process): Lagramge
+will report the best equations found so far.
+
+If you want to perform beam search instead of exhaustive, you can use
+the "-s beam" option:
+./bin/g -l linear.gramm -s beam -v price examples/data/autoprice.data
+
+The default beam width of 25 can be changed using "-b" option:
+./bin/g -l linear.gramm -s beam -b 5 -v price examples/data/autoprice.data
+
+The parameter fitting method performs gradient descent search, which is
+known to have problems with being trapped in local optima. To avoid
+that, it is recommended to perform multiple restarts of the method with
+random initializations of the parameter values. Option "-m" sets the
+number of restarts (default of 0 means no restarts):
+./bin/g -l linear.gramm -s beam -b 5 -m 8 -v price examples/data/autoprice.data
+
+By default, Lagramge considers all expressions that can be derived by
+the grammar using parse trees of depth at most 5. You can change that
+using the option "-d".
+
+Default search heuristic is MSE (mean squared error) - you can change
+this to MDL using "-h mdl" option: check the papers for more info on
+the formula used to calculate MDL. In short, MDL introduces penalty
+for equation complexity, thus preferring shorter equations over longer
+ones.
+
+Options "-t" and "-i" allow inducing differential equations: we can
+either specify which variable in the data set denotes time ("-t time")
+or specify the time interval between two rows in the table ("-i 0.5").
+
+Options "-c", "-e", "-l"  tell Lagramge when to stop. For example,
+"-c threshold -e 0.01" causes Lagramge to stop as soon as it finds an
+equation with a value of the heuristic function (MSE or MDL) <= 0.01,
+while "-c timelimit -l 10" causes Lagramge to stop after 10 minutes
+and report best equation found in that time.

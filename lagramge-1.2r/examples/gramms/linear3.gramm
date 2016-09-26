@@ -1,0 +1,1 @@
+%{#include <math.h>%}Linear -> Term;Linear -> Linear + Term;Term -> const[_:-1000:0.1:1000];Term -> const[_:-1000:0.1:1000] * V;

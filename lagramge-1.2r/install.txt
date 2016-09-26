@@ -1,0 +1,39 @@
+Lagramge has be only tested on Linux (various distributions) and
+OSX. All attempts to install Lagramge on Cygwin have failed due
+to the problems with dynamic library loading in runtime.
+
+Go to ./src/ directory and edit the files Makefile and gc. In both
+files, set the variable HOME_DIR to reflect the location where you
+unpacked the archive. If your system in 64-bit, edit line 7 in the
+"globals.h" file (remove word "long" from that line).
+
+Run "make all".
+
+If successful, copy the executable files "rg", "g", and "gc" to the
+./bin/ directory and start using Lagramge.
+
+On failure, check the following:
+
+ (1) check that lex/yacc (and *not* flex/bison) package is installed
+     on your system. I could not manage to compile Lagramge using
+     flex/bison: you might however try, if you really want to.
+
+ (2) gfortran package is installed on your system (note that gcc
+     versionos 4+ include gfortran, so you might not need to install
+     it separately). Note that the Fortran code for parameter fitting
+     is already compiled (directory ./src/alg-717/), however Lagramge
+     still need gfortran libraries in runtime.
+
+ (3) In case of problems with linking the parameter fitting code, you
+     should go to the ./src/TOMS-717/ directory and recompile the
+	 sources. Run "make clean" and "make" there to re-compile and
+     copy the object files to the ./src/alg-717/ directory, i.e., run
+     "cp *.o ../alg-717/".
+
+ (4) Lagramge uses shared library loading in runtime, which can cause
+     problesm on SELinux systems (the error "cannot restore segment
+     prot after reloc: Permission denied" is reported when Lagramge
+     tries to load the grammar library). See how you can avoid this
+     at: http://www.ittvis.com/services/techtip.asp?ttid=3092
+
+If nothing helps, try writing to me at ljupco.todorovski@ijs.si.

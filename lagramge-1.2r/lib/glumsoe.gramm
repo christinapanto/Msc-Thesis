@@ -1,0 +1,26 @@
+
+
+
+CR_phyto ->
+	+ Feeding_phyto * variable_phyto
+	- Decay_phyto
+	- Feeding_zoo * variable_zoo;
+
+
+Feeding_phyto -> const[_:0:0.1:10] * FL * FL;
+Feeding_phyto -> const[_:0:0.1:10] * FL + const[_:0:0.1:10] * FL;
+Feeding_phyto -> const[_:0:0.1:10] * FL;
+
+FL -> monod(const[_:0:0.1:10], FL_vars);
+FL -> FL_vars;
+
+FL_vars -> variable_phosp;
+FL_vars -> variable_nitro;
+FL_vars -> variable_temp;
+
+
+Feeding_zoo -> const[_:0:0.1:10] * variable_phyto;
+Feeding_zoo -> const[_:0:0:0];
+
+
+Decay_phyto -> const[_:0:0.1:10] * variable_phyto;

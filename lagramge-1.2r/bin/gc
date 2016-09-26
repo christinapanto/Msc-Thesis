@@ -1,0 +1,21 @@
+#!/bin/sh
+
+HOME_DIR=/Users/christinapantopoli/Desktop/lagramge-1.2r/
+BIN_DIR=$HOME_DIR/bin
+LIB_DIR=$HOME_DIR/lib
+
+if $BIN_DIR/rg $1; then
+	gn=`echo $1 | gawk -F'/' '{ print $NF; }'`
+	if clang -c -o functions.o functions.c; then
+		ld -dylib functions.o
+		rm -f $LIB_DIR/$gn.lib $LIB_DIR/$gn
+		mv a.out $LIB_DIR/$gn.lib
+		gawk '/^%{/, /^%}/ { next; } { print $0; }' $1 > $LIB_DIR/$gn
+		rm -f functions.c functions.o
+		echo "Please use '-g" $gn"' to run Lagramge using this grammar."
+	else
+		echo "Can not compile grammar" $1
+	fi
+else
+	echo "Can not compile grammar" $1
+fi

@@ -1,0 +1,1662 @@
+import org.jgap.InvalidConfigurationException;
+import org.jgap.gp.IGPProgram;
+import org.jgap.gp.impl.GPConfiguration;
+import javax.swing.*;
+import javax.swing.event.DocumentEvent;
+import javax.swing.event.DocumentListener;
+import javax.swing.table.*;
+import java.awt.*;
+import java.awt.event.*;
+import java.io.BufferedReader;
+import java.io.FileReader;
+import java.io.IOException;
+import java.net.URL;
+import java.text.NumberFormat;
+import java.text.ParseException;
+import java.util.*;
+import java.util.List;
+import java.util.concurrent.ExecutionException;
+
+import org.lsmp.djep.xjep.XJep;
+import org.nfunk.jep.Node;
+import org.nfunk.jep.function.Str;
+
+/**
+ * Created by Christina on 27/6/2016.
+ */
+public class Screen extends JPanel{
+
+    private static String DataPanel = "Data";
+    private static String OptionsPanel = "Options";
+    private static String ResultsPanel = "Results";
+    private static XJep editor = new XJep();
+    private static int numberOfEquations = 0;
+    private static Integer outputVariable; // default last
+    private static int DEFAULT_AMOUNT = 0;
+    private static int text_length = 10;
+    private static int left_length = 20;
+    private static int length = 150;
+    private static int height = 30;
+    private static int MIN_POPULATION = 100;
+    private static int MAX_POPULATION = 1000;
+    private static int MIN_GENERATIONS = 100;
+    private static int MAX_GENERATIONS = 10000;
+    private static int MAX_CROSSOVER = 8;
+    private static int MIN_CROSSOVER = 4;
+    private static int MIN_INIT = 2;
+    private static int MAX_INIT = 6;
+    private String[][] variableNames ;
+    private int[] numRows;
+    private int[] generations;
+    private double[][] dataSet;
+    private Double[][] dataSetForCalculations;
+    private int[] IndexOutVar;
+    private static ArrayList<Double> constants = new ArrayList<Double>();
+    public String[][] functions;
+    JLabel[] labels = new JLabel[12];
+    JTextField equations = new JTextField();
+    JPanel[] cardsEquations;
+    private int[] gen;
+    double[] error;
+    int[] save;
+    private NumberFormat integerFormat;
+    private MyVerifier verifier  = new MyVerifier();
+    private JTextField[] stopCriteria;
+    private JTextField[] crossDepth;
+    private JTextField[] evolve;
+    private JTextField[] inDepth;
+    private JTextField[] populationSize;
+    private JTextField[] targetFunction;
+    private JTextField[] differentialFor;
+    private JTextField[] differentialTo;
+    private JComboBox[] errorMethods;
+    private JComboBox[] typeOfEquation;
+    private String[] typeOfEquations = { "Normal", "Differential"};
+    private String[] errorMethodsOptions = { "total Error", "max Error", "min Error", "median Error", "mean Error"};
+    private JTextField[] fileName;
+    private String[] differentialVarFor;
+    private String[] differentialVarTo;
+    private String[] targetFunctionName;
+    private String[] diffName;
+    private double[] stopCriteriaFitness;
+    private int[][] positionsOfVarUsed;
+    private int[] crossoverDepth;
+    private int[] evolutions;
+    private int[] initDepth;
+    private int[] popSize;
+    private double[] fitness;
+    private static String[] dataFilePath;
+    private static String[] dataFileName;
+    private String[] methodChosen;
+    private String[] typeChosen;
+    private JButton[] startSearch ;
+    private JButton[] stopSearch ;
+    private JButton[] pauseSearch ;
+    private JButton[] chooseFile ;
+    private boolean[] start;
+    private boolean[] pause;
+    private boolean[] stop;
+    private EquationDiscovery[] eq;
+    private DocumentPDF[] pdf;
+    private EquationDiscovery equationDiscovery1;
+    private List<Solution> imgs;
+    private JFrame frame;
+    private int[] counterOfSolutions;
+    private Dimension size;
+    private FunctionsTable[] functionsTables;
+    private DisplayData[] showData;
+    private List<List<Solution>> solutionsForEquations = new ArrayList<>();
+    private List<Solution> solutions;
+    private JPanel initialScreen;
+    private VariablesDisplay[] varDisp;
+    private VariablesDisplay[] outDisp;
+    private DataTable[] dataTables;
+    private static DataSetDisplay[] dataSetDisplays;
+
+    // Transpose matrix
+    static Double [][] transposeMatrix(Double [][] m){
+        int r = m.length;
+        int c = m[0].length;
+        Double [][] t = new Double[c][r];
+        for(int i = 0; i < r; ++i){
+            for(int j = 0; j < c; ++j){
+                t[j][i] = m[i][j];
+            }
+        }
+        return t;
+    } // end transposeMatrix
+
+    void addComponentToPane(JFrame w) throws InvalidConfigurationException {
+        frame = w;
+        size = frame.getSize();
+        frame.setBackground(Color.WHITE);
+        setEditorForEquations();
+//        frame.addComponentListener(new ComponentAdapter(){
+//            public void componentResized(ComponentEvent e){
+//                size = frame.getSize();
+//                size = new Dimension(100, size.height-300);
+//            }
+//        });
+
+        createMenuBar();
+        setUpFormats();
+        JTabbedPane tabbedPane = new JTabbedPane();
+        JLabel label = new JLabel("How many equations will be solved?");
+        initialScreen = new JPanel();
+        initialScreen.add(label);
+        equations = new JTextField(integerFormat.format(DEFAULT_AMOUNT), text_length);
+        equations.setHorizontalAlignment(SwingConstants.RIGHT);
+        equations.setInputVerifier(verifier);
+        equations.setEditable(true);
+        initialScreen.add(equations);
+        JButton submit = new JButton("Submit");
+//        initialScreen.add(submit);
+//        submit.addActionListener(e -> {
+//            numberOfEquations = Integer.parseInt(equations.getText());
+        numberOfEquations = 3;
+
+            if (numberOfEquations == 0) {
+                MessagePopUp("At least one equation must be solved.");
+            }
+            else if (numberOfEquations < 5) {
+                numberOfEquations++;
+                initialiseAllVariablesUsed();
+                initialiseDoneStop();
+                initialScreen.remove(equations);
+                initialScreen.remove(label);
+                initialScreen.remove(submit);
+                createTabsForEquations(tabbedPane);
+            }
+//        });
+//        tabbedPane.add(initialScreen);
+        frame.add(tabbedPane);
+        frame.repaint();
+    }
+
+    private void runalgo(int which) {
+//        class MyWorker extends SwingWorker<List<Solution>, Solution> {
+        SwingWorker<List<Solution>, Solution> worker = new SwingWorker<List<Solution>, Solution>() {
+            @Override
+            protected List<Solution> doInBackground() {
+                List<Solution> solutionsForEquation = dataSetDisplays[which].getSolutions();
+                System.out.println("11111111111111  eq "+which+"  sol size  " + solutionsForEquation.size()
+                        +"  pause "+ pause[which]+"  gen  "+gen[which]+"  counter of solut  "
+                        +counterOfSolutions[which]+ "   size of list in shw data  "+showData[which].getSizeOfSolutions());
+                Solution solut;
+                IGPProgram fittest;
+                String sol;
+                try {
+                    System.out.println("the funcctions after read have sixe:  "+functions[which].length);
+                    if(gen[which] == 0) {
+                        System.out.println("variables names length"+dataTables[which].getVariableNames().length);
+                        for (int i = 0; i < positionsOfVarUsed[which].length; i++) {
+                            System.out.println("variable in screen at  poistions  new oder created "+positionsOfVarUsed[which][i]);
+
+                        }
+                        variableNames[which] = dataTables[which].reArrangeVariableNames(positionsOfVarUsed[which],
+                                IndexOutVar[which]);
+//                        System.out.println("output index form target function  "+variableNames[IndexOutVar[which]] + "  "+variableNames[0]);
+                        dataSetDisplays[which].setVariableNames(variableNames[which]);
+                        dataSetForCalculations = dataTables[which].getDataOfVariablesForAlgorithm(positionsOfVarUsed[which],
+                                IndexOutVar[which]);
+                        numRows[which] = dataTables[which].getNumRows();
+                        dataSetDisplays[which].setNumRows(numRows[which], which);
+                        int index = 0;
+                        for(int i=0;i<variableNames[which].length;i++)
+                        System.out.println("va naem " +variableNames[which][i]);
+                        System.out.println("vindex out for start " +index+ " "+numRows[which]);
+                        String[] selectedFunctions = functionsTables[which].getFunctionsSelected();
+                        addFunctions(selectedFunctions, which);
+                        generations[which] = eq[which].start(functions[which], popSize[which],
+                                evolutions[which], crossoverDepth[which], variableNames[which],
+                                dataSetForCalculations, numRows[which], index, methodChosen[which]);
+                    }
+                } catch (Exception e) {
+                    e.printStackTrace();
+                }
+                while(error[which] != 0 && counterOfSolutions[which] < 50 && !stop[which]) {
+                    if (!pause[which]) {
+                         int k = solutionsForEquation.size();
+
+                        if(gen[which]%50==0)System.out.println("22222222222222  "+which+"   "+gen[which] +
+                                "  numebr of sdoltuions  "+k + " counter of sol " + counterOfSolutions[which]+
+                                " data at 00:  "
+                                +dataTables[which].getDataOfVariablesForAlgorithm(positionsOfVarUsed[which], IndexOutVar[which])[0][0]);
+                        try {
+                            fittest = eq[which].RunSearch(gen[which], which);
+                            if (fittest != null) {
+                            sol = eq[which].getStringProgram(fittest);
+                            if (sol != null && !sol.equals("")) {
+                                solut = createNewSolution(fittest, which);
+                                solutionsForEquation.add(solut);
+                                publish(solut);
+                                dataSetDisplays[which].addSolution(solut, counterOfSolutions[which]);
+                                counterOfSolutions[which]++;
+//                                System.out.println(gen[which]+ " "+which +" counter of solutions "+
+//                                        counterOfSolutions[which]+" size of list in swing "
+//                                        +solutionsForEquation.size() +"  "+sol
+//                                +"  solutions indatasetdisplay size "+dataSetDisplays[which].getSizeOfSolutions());
+//                                error[which] = solut.getErrorD();
+                                dataSetDisplays[which].setError(solut.getErrorD());
+                            }
+                        }
+                        gen[which]++;
+                        dataSetDisplays[which].setGen(gen[which]);
+                      }
+                      catch (Exception e) {
+                          System.out.println("Error in running search for equation "+which+ " " +e +" num_rows "+numRows[which] +"  "+ eq[which].getNumRows() + " gen crushed "+gen[which]);
+                          printTabke(transformData(eq[which].getData()));
+                          stop[which] = true;
+                      }
+                    }
+                }
+                return solutionsForEquation;
+            }
+            //            private int which = whichFromUser;
+
+            @Override
+            protected void process(List<Solution> chunks) {
+                List<Solution> results = dataSetDisplays[which].getSolutions();
+                System.out.println("in process the datasetdisplay sol size  "+dataSetDisplays[which].getSizeOfSolutions());
+                int k = dataSetDisplays[which].getSizeOfSolutions();
+                System.out.println("number of solutio  "+k+"  for panel "+which +" "+save[which] +" "+ k + " counter of csol. "+counterOfSolutions[which] );
+                for (int j = save[which]; j < k; j++) {
+                    Solution s = dataSetDisplays[which].getSolutionAtIndex(j);
+                    String sol = editSolution(s.getSolution());
+                    showData[which].setDataSet(s.getComplexityInt(),
+                            s.getErrorD(), sol, j);
+                    save[which] = j;
+
+                }
+                double[][] dataSetForOutput = createTableOfOutputData(which);
+                if (results.size()!=0) {
+                    System.out.println("don not add data if list is empty");
+                    showData[which].createListForTable(results);
+
+                    outDisp[which].setData(dataSetForOutput, results);
+                }
+                outDisp[which].setDataForGraphs(dataTables[which].getDataOfVariables(), variableNames[which],
+                        IndexOutVar[which], numRows[which]);
+                System.out.println("added eqautions to panel");
+            }
+
+            @Override
+            protected void done() {
+                try {
+                    imgs = get();
+                    System.out.println("algorithmfinished for equation "+ which+"  "+ (error[which] != 0)+ "  " +( counterOfSolutions[which] < 50 )+ " "+ (!stop[which]));
+                } catch (InterruptedException ignore) {
+                } catch (java.util.concurrent.ExecutionException e) {
+                    String why;
+                    Throwable cause = e.getCause();
+                    if (cause != null) {
+                        why = cause.getMessage();
+                    } else {
+                        why = e.getMessage();
+                    }
+                    System.err.println("Error retrieving data during swingWorker: " + why+ "  ");
+                }
+            }
+        };
+        frame.repaint();
+//        MyWorker worker = new MyWorker();
+        worker.execute();
+    }
+
+    void printTabke(double[][] d) {
+        for(int i=0;i<d.length;i++) {
+            for (int j =0;j<d[0].length;j++) {
+                System.out.print(d[i][j] + "    ");
+            }
+            System.out.println();
+        }
+    }
+
+    private void initialiseAllVariablesUsed() {
+        dataFilePath        = new String[numberOfEquations];
+        differentialVarFor  = new String[numberOfEquations];
+        differentialVarTo  = new String[numberOfEquations];
+        dataFileName        = new String[numberOfEquations];
+        methodChosen        = new String[numberOfEquations];
+        typeChosen          = new String[numberOfEquations];
+        dataTables          = new DataTable[numberOfEquations];
+        dataSetDisplays     = new DataSetDisplay[numberOfEquations];
+        eq                  = new EquationDiscovery[numberOfEquations];
+        startSearch         = new JButton[numberOfEquations];
+        stopSearch          = new JButton[numberOfEquations];
+        pauseSearch         = new JButton[numberOfEquations];
+        generations         = new int[numberOfEquations];
+        numRows             = new int[numberOfEquations];
+        IndexOutVar         = new int[numberOfEquations];
+        counterOfSolutions  = new int[numberOfEquations];
+        variableNames       = new String[numberOfEquations][20];
+        functionsTables     = new FunctionsTable[numberOfEquations];
+        showData            = new DisplayData[numberOfEquations];
+        pdf                 = new DocumentPDF[numberOfEquations];
+        functions           = new String[numberOfEquations][];
+        save                = new int[numberOfEquations];
+        positionsOfVarUsed  = new int[numberOfEquations][];
+        initialiseMoreData();
+    }
+
+    private void initialiseMoreData() {
+        gen   = new int [numberOfEquations];
+        error = new double[numberOfEquations];
+        for (int i = 0; i < numberOfEquations; i++) {
+            dataTables[i]         = new DataTable();
+            gen[i]                = 0;
+            error[i]              = 10;
+            counterOfSolutions[i] = 0;
+            methodChosen[i]       = errorMethodsOptions[0];
+            gen[i]                = 0;
+        }
+        errorMethods        = new JComboBox[numberOfEquations];
+        typeOfEquation      = new JComboBox[numberOfEquations];
+        stopCriteria        = new JTextField[numberOfEquations];
+        crossDepth          = new JTextField[numberOfEquations];
+        evolve              = new JTextField[numberOfEquations];
+        inDepth             = new JTextField[numberOfEquations];
+        fileName            = new JTextField[numberOfEquations];
+        populationSize      = new JTextField[numberOfEquations];
+        targetFunction      = new JTextField[numberOfEquations];
+        differentialFor     = new JTextField[numberOfEquations];
+        differentialTo      = new JTextField[numberOfEquations];
+        chooseFile          = new JButton[numberOfEquations];
+        initDepth           = new int[numberOfEquations];
+        crossoverDepth      = new int[numberOfEquations];
+        popSize             = new int[numberOfEquations];
+        fitness             = new double[numberOfEquations];
+        evolutions          = new int[numberOfEquations];
+        stopCriteriaFitness = new double[numberOfEquations];
+        varDisp             = new VariablesDisplay[numberOfEquations];
+        outDisp             = new VariablesDisplay[numberOfEquations];
+    }
+
+    private void initialiseDoneStop () {
+        targetFunctionName  = new String[numberOfEquations];
+        diffName            = new String[numberOfEquations];
+        start               = new boolean[numberOfEquations];
+        pause               = new boolean[numberOfEquations];
+        stop                = new boolean[numberOfEquations];
+        intialiseValuesOfControllers(numberOfEquations);
+    }
+
+    private void intialiseValuesOfControllers(int which) {
+        for (int i = 0; i < numberOfEquations; i++) {
+            if (i != which) {
+                start[i]                = true;
+                targetFunctionName[i]   = "";
+                dataSetDisplays[i]      = new DataSetDisplay(IndexOutVar[i], variableNames[i], dataSet);
+                solutions               = new ArrayList<>();
+                differentialVarFor[i]   = "";
+                differentialVarTo[i]    = "";
+                typeChosen[i]           = typeOfEquations[0];
+                diffName[i]             = "";
+                stopCriteriaFitness[i]  = -1.0d;
+                solutionsForEquations.add(i, solutions);
+            }
+            pause[i] = false;
+            stop[i]  = false;
+        }
+        try {
+            GPConfiguration config = new GPConfiguration("gp", "standard");
+            equationDiscovery1 = new EquationDiscovery(config, 0);
+        }
+        catch (Exception e) {
+            System.out.println("initialisation of first eq failed " +e);
+        }
+    }
+
+    private void createTabsForEquations(JTabbedPane tabbedPane) {
+        cardsEquations = new JPanel[numberOfEquations];
+        for (int i = 0 ;i < numberOfEquations; i++) {
+            cardsEquations[i] = new JPanel();
+            cardsEquations[i].setBackground(Color.WHITE);
+//            cardsEquations[i].setSize(size);
+            cardsEquations[i].setLayout(new BoxLayout(cardsEquations[i], BoxLayout.Y_AXIS));
+            cardsEquations[i].add(addIndividualHeader(i));
+            cardsEquations[i].add(individualTabsForEquation(i));
+
+        }
+        for (int i = 0 ;i < numberOfEquations-1; i++) {
+            tabbedPane.addTab("Equation "+(i+1), cardsEquations[i]);
+        }
+        frame.add(tabbedPane);
+    }
+
+    private boolean checkTargetFunctions(int which) {
+        String sampleString         = dataSetDisplays[which].getTargetExpresion();
+        String[] symbols            = sampleString.split("");
+        int[] countSymbolsAllowed   = new int[4];
+        int[] positionOfParenthesis = new int[2];
+        String functionName = "";
+        if (sampleString.equals("")) {
+            return true;
+        }
+        for (int k = 0; k < symbols.length; k++) {
+            char c = symbols[k].charAt(0);
+            if (!symbols[k].equals("(") && !symbols[k].equals(")") && !symbols[k].equals("=")
+                    && !Character.isLetter(c) && !Character.isDigit(c)
+                    && !symbols[k].equals(" ") && !symbols[k].equals(","))
+                return true;
+            if (symbols[k].equals("=")) countSymbolsAllowed[0]++;
+            else if (symbols[k].equals("(")) {
+                positionOfParenthesis[0] = k;
+                countSymbolsAllowed[1]++;
+                if ( k > 1 && Character.isLetter(symbols[k-1].charAt(0)) ) {
+                    functionName = symbols[k-1];
+                }
+            }
+            else if (symbols[k].equals(")")) {
+                positionOfParenthesis[1] = k;
+                countSymbolsAllowed[2]++;
+            }
+            else if (symbols[k].equals(",")) countSymbolsAllowed[3]++;
+        }
+        for (int j = 0; j < 3; j++) {
+            if (countSymbolsAllowed[j] != 1) {
+                return true;
+            }
+        }
+        if (positionOfParenthesis[0] > positionOfParenthesis[1]) {
+            return true;
+        }
+        String[] variables = sampleString.split("\\W");
+        String outputvalue = variables[0];
+        if (functionName.equals(outputvalue) || functionName.equals("")) {
+            return true;
+        }
+        int variablesLength = variables.length-2;
+        if (variablesLength < 1) {
+            return true;
+        }
+        if (checkVariablesInTargetFunction(which, variables, outputvalue, functionName)) {
+            return true;
+        }
+        dataSetDisplays[which] = new DataSetDisplay(IndexOutVar[which],
+                dataTables[which].getVariableNames(), dataTables[which].getDataOfVariables());
+        return false;
+    }
+
+    private boolean checkVariablesInTargetFunction(int which, String[] variables, String outputvalue, String functionName) {
+        int variablesLength = variables.length-2;
+        String[] inputVariables = new String[variablesLength];
+        int cnt                 = 0;
+        int outputCnt           = 0;
+        int outputIndex         = 0;
+        //cheking if the variables in the target expression is not used as an
+        // output value and not as hte name of the function
+        for (int i = 0; i < variables.length; i++) {
+            if (!variables[i].equals("") && !variables[i].equals(outputvalue)
+                    && !variables[i].equals(functionName)) {
+                inputVariables[cnt] = variables[i];
+                System.out.println("input varibale fromt arget functions "+inputVariables[cnt]);
+                cnt++;
+            }
+        }
+        String[] dataVariables = dataTables[which].getVariableNames();
+        if (cnt == 0) {
+            return true;
+        }
+        int inputVar = cnt;
+        int positionsIndex = 0;
+        int variablesUsed = 0;
+//        System.out.println("reached here with "+inputVar +" "+ outputCnt);
+        for (int m = 0; m < inputVar; m++) {
+//            System.out.println("reached here in loop check varss " + cnt + " " + outputCnt);
+            cnt = 0;
+            for (int l = 0; l < dataVariables.length; l++) {
+//                System.out.println("cehekcing var " + inputVariables[m] + " to " + dataVariables[l]);
+                if (inputVariables[m].equals(dataVariables[l])) {
+                    cnt++;
+                    variablesUsed++;
+                }
+                if (dataVariables[l].equals(functionName)) {
+                    return true;
+                }
+//                System.out.println("check output var " + outputvalue.equals(dataVariables[l]) + " " + typeChosen[which].equals(typeOfEquations[0]));
+                if (outputvalue.equals(dataVariables[l]) && typeChosen[which].equals(typeOfEquations[0])) {
+                    outputCnt++;
+                    outputIndex = l;
+                } else if (typeChosen[which].equals(typeOfEquations[1])) {
+                    if (outputvalue.equals(diffName[which])) {
+                        outputCnt++;
+                        outputIndex = variableNames[which].length - 1;
+                    }
+                }
+
+            }
+            //It means there is an input variable that does not exist in the input data
+            if (cnt == 0 || outputCnt == 0) {
+                return true;
+            }
+        }
+//        System.out.println("reached here with #### " + variablesUsed + " " + outputCnt);
+        positionsOfVarUsed[which] = new int[variablesUsed];
+        for (int m = 0; m < inputVar; m++) {
+            for (int l = 0; l < dataVariables.length; l++) {
+//                System.out.println("chekcing to adding the postions in the positions array "+inputVariables[m] + " " +dataVariables[l]);
+                if (inputVariables[m].equals(dataVariables[l])) {
+                    positionsOfVarUsed[which][positionsIndex] = l;
+//                    System.out.println("adding the postions in the positions array "+l);
+                    positionsIndex++;
+                }
+            }
+        }
+        IndexOutVar[which] = outputIndex;
+        return false;
+    }
+
+
+    private void addActionListenersToButtons(int which){
+        startSearch[which].addActionListener(e -> {
+            if(start[which] && gen[which] == 0) {
+//                System.out.print("I am starting eqaution  "+which);
+//                System.out.println("  with rows  "+numRows[which]+ " variables lengthj   "
+//                        + variableNames[which].length + " rows from dataable " + dataSetDisplays[which].getNumRows());
+                dataSetDisplays[which] = new DataSetDisplay(IndexOutVar[which],
+                        dataTables[which].getVariableNames(), dataTables[which].getDataOfVariables());
+                functions[which] = functionsTables[which].getFunctionsSelected();
+                dataSetDisplays[which].setFunctions(functions[which]);
+                dataSetDisplays[which].setTargetExpresion(targetFunctionName[which]);
+                variableNames[which] = dataTables[which].getVariableNames();
+                if (!dataTables[which].checkIfNumRowsEqual() && typeChosen[which].equals(typeOfEquations[0])) {
+                    MessagePopUp("Check the data, uneven number of rows.");
+                }
+                else if (dataTables[which].getNumRows() == 0) {
+                    MessagePopUp("Check the data, no data found.");
+                } else if (dataFilePath[which] == null && dataTables[which].getNumRows() == 0) {
+                    MessagePopUp("Data not given, choose a file or add data.");
+                } else if (dataTables[which].checkUniqueColumn()) {
+                    MessagePopUp("The name of variables are not unique.");
+                } else if (checkVariablesForDifferential(which)) {
+                    MessagePopUp("The variables used for creating the differential are wrong.");
+                } else if (checkTargetFunctions(which)) {
+                    if (targetFunctionName[which].equals(""))
+                        MessagePopUp("Empty target function.");
+                    else
+                        MessagePopUp("Problem with the target function.");
+                } else {
+                    if (start[which]) {
+                        intialiseValuesOfControllers(which);
+                        for(int i=0;i<numberOfEquations;i++) {
+                            System.out.println("size of lists o fsolutions for equation "+i +" "+dataSetDisplays[which].getSizeOfSolutions() +  " list size  "+solutionsForEquations.get(which).size()
+                                    + " counter sol "+counterOfSolutions[which] + "  gen  "+gen[which] + "  sstasrt  " +start[which]+ " sop   "+stop[which]);
+                        }
+                        start[which] = false;
+                        setTextFiledForEquationUneditable(which);
+                        dataTables[which].stopTableFrombeingEdited();
+                        System.out.println("the funcctions after read have sixe:  "+functions[which].length);
+                        runalgo(which);
+                    }
+                }
+            }
+        });
+        pauseSearch[which].addActionListener(e -> {
+            gen[which] = dataSetDisplays[which].getGen();
+            for (int i =0;i<numberOfEquations;i++) {
+                System.out.println("pause ist for eq  "+i+"  "+pause[i] + "   "+gen[i]+"  "  +dataSetDisplays[which].getGen());
+
+            }
+                System.out.println(pause[which] && gen[which] > 0   );
+            if (pause[which] && gen[which] > 0) {
+                pause[which] = !pause[which];
+//                System.out.println("pause changed the algorithm should rn again where it paused last time "+pause[which]);
+                runalgo(which);
+            }
+            else {
+                pause[which] = !pause[which];
+            }
+//            System.out.println(which + "  pause changed "+pause[which]);
+        });
+        stopSearch[which].addActionListener(e -> {
+            if (gen[which] > 0)
+            stop[which] = true;
+        });
+    }
+
+
+    void setTextFiledForEquationUneditable(int which) {
+        targetFunction[which].setEditable(false);
+        populationSize[which].setEditable(false);
+        evolve[which].setEditable(false);
+        inDepth[which].setEditable(false);
+        crossDepth[which].setEditable(false);
+        stopCriteria[which].setEditable(false);
+        differentialTo[which].setEditable(false);
+        differentialFor[which].setEditable(false);
+        fileName[which].setEditable(false);
+        chooseFile[which].addActionListener(e->{});
+        startSearch[which].addActionListener(e->{});
+    }
+
+    private double[][] createDataForAlgorithm(int which) {
+        int columns =positionsOfVarUsed[which].length + 1;
+        System.out.println("position of vas used "+positionsOfVarUsed[which].length);
+        double[][] data = new double[columns][numRows[which]];
+//        double totalData =
+//        for (int j = 0; j < numRows[which]; j++) {
+//            data[0][j] =
+//        }
+//        for (int i = 0; i < columns; i++) {
+//            for (int j = 0; j < numRows[which]; j++) {
+//                data[i+1][j] = [positionsOfVarUsed[i][j];
+//            }
+//        }
+        printTabke(data);
+        return data;
+    }
+
+    private boolean checkVariablesForDifferential(int which) {
+        int found = 0;
+        int[] indexes = new int[2];
+        if (!typeChosen[which].equals(typeOfEquations[1])) {
+            return false;
+        }
+            if (differentialVarFor[which].equals(differentialVarTo[which])) {
+            System.out.println("same name for diff vaers");
+            return true;
+        }
+        for (int i = 0; i < variableNames[which].length; i++) {
+            if (differentialVarFor[which].equals(variableNames[which][i])) {
+                indexes[0] = i;
+                found++;
+            }
+            if (differentialVarTo[which].equals(variableNames[which][i])) {
+                indexes[1] = i;
+                found++;
+            }
+        }
+        if (found != 2) {
+            System.out.println("the vars for fiff do not exis in input varaibels  "+found);
+            return true;
+        }
+        createDataForDifferential(which, indexes);
+        return false;
+    }
+
+    private boolean createDataForDifferential(int which, int[] indexes) {
+        int varLen = variableNames[which].length;
+        int newNumOfRows = numRows[which]-1;
+        double diffFor;
+        double diffTo;
+        int indexFor = indexes[0];
+        int indexTo  = indexes[1];
+        double[][] data = dataTables[which].getDataOfVariables();
+        double[] differentialDataAsOutput = new double[newNumOfRows];
+        numRows[which] = newNumOfRows;
+
+        System.out.println("################ "+numRows[which]);
+        for (int i = 0; i < newNumOfRows; i++) {
+            diffFor = data[indexFor][i+1]-data[indexFor][i];
+            diffTo = data[indexTo][i+1]-data[indexTo][i];
+            differentialDataAsOutput[i] = diffFor/diffTo;
+        }
+        for (int i = 0; i < varLen; i++ ) {
+            if (diffName[which].equals(variableNames[which][i])) {
+                return false;
+            }
+        }
+        diffName[which] = "D" +variableNames[which][indexFor]+"to"+ variableNames[which][indexTo];
+        dataTables[which].setRowToTable(differentialDataAsOutput, diffName[which], variableNames[which].length);
+        variableNames[which] = dataTables[which].getVariableNames();
+        dataTables[which].setNumRows(numRows[which]);
+        dataSetDisplays[which].setNumRows(numRows[which], which);
+        dataSetDisplays[which].setVariableNames(variableNames[which]);
+        return true;
+    }
+
+
+    private JPanel addIndividualHeader(int which) {
+        JPanel header = new JPanel();
+        header.setBackground(Color.WHITE);
+        header.setLayout(new FlowLayout(FlowLayout.CENTER));
+        startSearch[which]  = new JButton();
+        pauseSearch[which]  = new JButton();
+        stopSearch[which]   = new JButton();
+        ImageIcon icon      = readAnImage("start-green.png");
+        ImageIcon icon1     = readAnImage("pause-orange.jpg");
+        ImageIcon icon2     = readAnImage("stop-button.png");
+        if (icon == null) {
+            startSearch[which].setText("Start");
+        }
+        if (icon1 == null) {
+            pauseSearch[which].setText("Pause");
+        }
+        if (icon2 == null) {
+            stopSearch[which].setText("Stop");
+        }
+        if (icon !=null && icon2 !=null && icon1 != null) {
+            startSearch[which].setIcon(icon);
+            pauseSearch[which].setIcon(icon1);
+            stopSearch[which].setIcon(icon2);
+            startSearch[which].setPreferredSize(new Dimension(30, 30));
+            startSearch[which].setBackground(Color.WHITE);
+            pauseSearch[which].setPreferredSize(new Dimension(30, 30));
+            pauseSearch[which].setBackground(Color.WHITE);
+            stopSearch[which].setPreferredSize(new Dimension(30, 30));
+            stopSearch[which].setBackground(Color.WHITE);
+            startSearch[which].setBorderPainted(false);
+            pauseSearch[which].setBorderPainted(false);
+            stopSearch[which].setBorderPainted(false);
+        }
+        header.add(startSearch[which]);
+        header.add(pauseSearch[which]);
+        header.add(stopSearch[which]);
+        addActionListenersToButtons(which);
+        return header;
+    }
+
+    private ImageIcon readAnImage(String name) {
+        ImageIcon icon = null;
+        Image img;
+        URL u = getClass().getResource(name);
+        if (u != null) {
+            icon = (new ImageIcon(u));
+            img  = icon.getImage();
+            img  = img.getScaledInstance(20, 20, java.awt.Image.SCALE_SMOOTH);
+            icon = new ImageIcon(img);
+        }
+        return icon;
+    }
+
+    private JTabbedPane individualTabsForEquation(int which) {
+        try {
+            GPConfiguration config = new GPConfiguration("gp", "standard");
+            eq[which] = new EquationDiscovery(config, which);
+        } catch (InvalidConfigurationException e) {
+            e.printStackTrace();
+        }
+        JTabbedPane tabbedEquation = new JTabbedPane();
+        JPanel card1 = new JPanel();
+        card1.setLayout(new BorderLayout());
+        card1.add(dataTableControl(which));
+        tabbedEquation.addTab(DataPanel, card1);
+//        tabbedEquation.setPreferredSize(size);
+        JPanel card2 = new JPanel();
+        card2.setLayout(new BorderLayout());
+        setupGUI(card2, which);
+        tabbedEquation.addTab(OptionsPanel, card2);
+        card2.setBackground(Color.WHITE);
+        JPanel card6 = new JPanel();
+        card6.setBackground(Color.WHITE);
+        card6.setLayout(new BoxLayout(card6, 2));
+        showVariablesData(card6, which);
+        tabbedEquation.addTab("Variables Display", card6);
+        JPanel card4 = new JPanel();
+        outputResults(card4, which);
+        tabbedEquation.addTab(ResultsPanel, card4);
+        JPanel card3 = new JPanel();
+        card3.add(generateReport(which));
+        tabbedEquation.addTab("latex", card3);
+        frame.addComponentListener(new ComponentAdapter(){
+            public void componentResized(ComponentEvent e){
+                size = frame.getSize();
+                size = new Dimension(size.width-100, size.height-300);
+                tabbedEquation.setPreferredSize(size);
+                card1.setSize(size);
+                varDisp[which].getSizeOfFrame(size);
+            }
+        });
+        return tabbedEquation;
+    }
+
+    private boolean checkAndAssignDataForReport(int which) {
+        numRows[which] = dataTables[which].getNumRows();
+        dataSetDisplays[which].setNumRows(numRows[which], which);
+        if (!dataTables[which].checkIfNumRowsEqual()) {
+            MessagePopUp("Unable to generate a report. Check the data");
+            return false;
+        }
+        else if (dataFilePath[which] == null && numRows[which] == 0) {
+            MessagePopUp("Unable to generate a report. Data not given, choose a file or add data.");
+            return false;
+        }
+        variableNames[which] = dataTables[which].getVariableNames();
+        dataSetDisplays[which].setVariableNames(variableNames[which]);
+        return true;
+    }
+
+    private JPanel generateReport(int which) {
+        JPanel p = new JPanel();
+        JButton button = new JButton("Generate Report");
+        p.add(button);
+        button.addActionListener(e-> {
+            System.out.println("cliekcdf tog eenrate pdf, functions length "+functions[which].length);
+            dataSetDisplays[which] = new DataSetDisplay(IndexOutVar[which],
+                    dataTables[which].getVariableNames(), dataTables[which].getDataOfVariables());
+            if (checkAndAssignDataForReport(which)) {
+                pdf[which] = new DocumentPDF("equation " + which);
+                addInputDataAndGraphicsToPDF(which);
+                int k = counterOfSolutions[which];
+                System.out.println("the soltuoins for equtain "+which+ " are  "+ k);
+                System.out.println(eq[which].getCounterOfSolutions() + " from eq counter of sol");
+                for (int j = 0; j < k; j++) {
+                    double[][] dataSetForOutput = createTableOfOutputData(which);
+//                    outDisp[which].setData(dataSetForOutput,
+//                            showData[which].get());
+                    Solution solution = showData[which].getSolutionAtIndex(j);
+                    outDisp[which].addPointForSpecificSolution(j);
+                    outDisp[which].setDataForGraphs(dataTables[which].getDataOfVariables(), variableNames[which],
+                            IndexOutVar[which], numRows[which]);
+                    String sol = editSolution(solution.getSolution());
+                    pdf[which].addParagrah("Solution " + (j + 1));
+//                    pdf[which].addImageToFile(showData[which].getLatexImage(sol));
+                    addTableOfDetails(which, j);
+                    int variablesLength = dataTables[which].getColumnCount();
+                    System.out.println("columns of valirables length  " + variablesLength);
+                    for (int var = 0; var < variablesLength; var++) {
+                        String nameOfFile = "src/graphOfSolution"+variableNames[which][var]+j+".png";
+                        System.out.print("variables length " + variablesLength);
+//                        System.out.println("  creating graph for variable " + variableNames[which][j]);
+                        System.out.println(" to " + variableNames[which][var]);
+                        outDisp[which].getGraphImage(j, var, nameOfFile);
+                        pdf[which].addImageToFileFrom(nameOfFile);
+                        pdf[which].addImageToFileFrom("complexityofSolution" + j + var);
+                    }
+//                if (k==1)pdf[which].addImageToFile(outDisp[which].getGraphImage(0));
+//                pdf[which].addImageToFileFrom("graphOfSolution"+j+var);
+//                pdf[which].addImageToFileFrom("complexityofSolution"+j);
+                }
+//                pdf[which].createTable();
+                pdf[which].closePdf();
+            }
+        });
+
+        return p;
+    }
+
+
+    void addTableOfDetails(int which, int sol) {
+        Solution fittest            = showData[which].getSolutionAtIndex(sol);
+        String solution             = fittest.getSolution();
+        String complex              = fittest.getComplexity();
+        String error                = fittest.getError();
+        String minError             = fittest.getMinError();
+        String maxError             = fittest.getMaxError();
+        String meanError            = fittest.getMeanError();
+        String medianError          = fittest.getMedianError();
+        String totalError           = fittest.gettotalError();
+        String correlation          = fittest.getCorrelation();
+        pdf[which].createTableForSolution(solution, error, correlation, complex, medianError, meanError,
+                totalError, minError, maxError);
+
+    }
+
+    void addInputDataAndGraphicsToPDF(int which) {
+        String target = targetFunctionName[which];
+        System.out.println( target + " this is suppsoed to be the target function");
+        pdf[which].createRowTitleAndText("Target function: " , target);
+        String variableNamesOut = "";
+        String buildingBlocks = "";
+        int i;
+        for (i = 0; i < variableNames[which].length - 1; i++) {
+            variableNamesOut+= variableNames[which][i]+" , ";
+        }
+        variableNamesOut+= variableNames[which][i];
+        String[] selectedFunctions = functionsTables[which].getFunctionsSelected();
+        addFunctions(selectedFunctions, which);
+        for(i = 0; i < functions[which].length - 1; i++) {
+            buildingBlocks += functions[which][i] + " , ";
+        }
+        if(functions[which].length >0)
+            buildingBlocks += functions[which][i];
+        pdf[which].createRowTitleAndText("Inputed variables: ", variableNamesOut);
+        pdf[which].createRowTitleAndText("Building Blocks of Algorithm: ",buildingBlocks);
+        pdf[which].createRowTitleAndText("Graphs of Variables", "");
+        varDisp[which].setDataForGraphs(dataTables[which].getDataOfVariables(), variableNames[which],
+                IndexOutVar[which], numRows[which]);
+        varDisp[which].printDataInVariablesDisplay();
+        System.out.println("variables length when dadding data " + variableNames[which].length);
+        for (i = 0; i < variableNames[which].length; i++) {
+            String nameOfGraph = "src/equation_"+which+"_graphOfVariable_"+variableNames[which][i]+"_"+i+".png";
+            String nameOfFile = "equation_"+which+"_graphOfVariable_"+variableNames[which][i]+"_"+i+".png";
+            if (varDisp[which].getGraphImageForVar(i, -1, nameOfGraph)) {
+                System.out.println("name of file for grpah " + nameOfFile);
+                pdf[which].addImageToFileFrom(nameOfFile);
+            }
+        }
+        System.out.println("target function for pdf:  "+targetFunctionName[which]+ " index of output var: "+ IndexOutVar[which]+ "  output variable: " + variableNames[which][IndexOutVar[which]]);
+        for (i = 0; i < variableNames[which].length && targetFunctionName[which]!=""; i++) {
+            int solIndex = IndexOutVar[which];
+            String outputVar = variableNames[which][IndexOutVar[which]];
+            if (i != solIndex) {
+                String nameOfGraph = "equation_"+which+"graphOfVariable_"+outputVar+"_to_"+variableNames[which][i]+".png";
+                String nameOfFile = "src/"+nameOfGraph;
+                outDisp[which].getGraphImageForVar(solIndex, i, nameOfFile);
+                System.out.println("name of grpah for outu  " + nameOfGraph);
+                pdf[which].addImageToFileFrom(nameOfGraph);
+            }
+        }
+    }
+
+    private void addFunctions(String[] selectedFunctions, int which) {
+        int numberOfFunctions = functions[which].length;
+        int initialFunctions  = functions[which].length;
+        System.out.println("function legnth from file  "+numberOfFunctions);
+        System.out.println("function legnth from input  "+selectedFunctions.length);
+        int[] positionsOfNew = new int[selectedFunctions.length];
+        int cnt = 0;
+        boolean found;
+        for (int i = 0; i < selectedFunctions.length; i++) {
+            positionsOfNew[i] = -1;
+            found = false;
+            for (int j = 0; j < functions[which].length; j++) {
+                if (selectedFunctions[i].equals(functions[which][j])) {
+                    found = true;
+                }
+            }
+            if (!found) {
+                positionsOfNew[cnt] = i;
+                cnt++;
+                numberOfFunctions++;
+            }
+        }
+        String[] newFunctions = new String[numberOfFunctions];
+        for (int j = 0; j < functions[which].length; j++) {
+            newFunctions[j] = functions[which][j];
+        }
+        for (int i = 0; i < selectedFunctions.length; i++) {
+            if (positionsOfNew[i] == i) {
+                newFunctions[initialFunctions] = selectedFunctions[i];
+                initialFunctions++;
+            }
+        }
+        functions[which] = newFunctions;
+    }
+
+    private JScrollPane dataTableControl(int which) {
+        JScrollPane pane = dataTables[which].getScrollPane();
+        updateDataForVariables(which);
+        return pane;
+    }
+
+    private void showVariablesData(JPanel panel, int which) {
+        varDisp[which] = new VariablesDisplay(dataSet, variableNames[which]);
+        panel.add(varDisp[which].getScrollPane());
+        panel.add(varDisp[which].addGraphToPanel());
+    }
+
+    private int[] calculateComplexity(String[] names, int which) {
+        int length = names.length;
+        int []complex = new int [length];
+        for (int i = 0; i < length; i++) {
+            complex[i] = equationDiscovery1.complexityOfFunctions(names[i]);
+        }
+        return complex;
+    }
+
+    private void outputResults(JPanel panel, int which) {
+        panel.setLayout(new GridLayout(2,2));
+        showData[which] = new DisplayData();
+        outDisp[which] = new VariablesDisplay(dataSet, variableNames[which]);
+        JScrollPane pane = showData[which].getJScrollPane();
+        JScrollPane contents = showData[which].getJScrollPaneContents();
+        panel.add(pane);
+        panel.add(outDisp[which].addGraphToPanel());
+        panel.add(contents);
+        panel.add(outDisp[which].addDetailsGraphToPanel());
+        setDataToTableAndGraph(which);
+    }
+
+    private void setDataToTableAndGraph(int which) {
+        JTable t = showData[which].getTable();
+        t.getSelectionModel().addListSelectionListener(event -> {
+            int i = t.getSelectedRow();
+            int size = showData[which].getSizeOfSolutions();
+            System.out.println("which panle  "+which + "  solution: "+ i + "   "+t.getValueAt(i, 1)+"    "+size + "  "+counterOfSolutions[which]) ;
+            if (i > -1 && t.getValueAt(i, 0) != null && i < size) {
+                passDataToTableOfContents(i, which, size);
+                outDisp[which].addPointForSpecificSolution(i);
+            }
+        });
+    }
+
+    private void updateDataForVariables(int which) {
+        if (which != numberOfEquations-1) {
+            JTable t = dataTables[which].getTable();
+            t.getModel().addTableModelListener(TableModelEvent -> {
+                int row = TableModelEvent.getFirstRow();
+                int column = TableModelEvent.getColumn();
+                TableModel model = (TableModel) TableModelEvent.getSource();
+                Object value = model.getValueAt(row, column);
+                dataTables[which].addDataToTable(row, column, value);
+                double[][] data = dataTables[which].getDataOfVariables();
+                String[] variables = dataTables[which].getVariableNames();
+                int rows = dataTables[which].getNumRows();
+                varDisp[which].clearPreviousData();
+                varDisp[which].setDataForGraphs(data, variables,
+                        IndexOutVar[which], rows);
+            });
+        }
+    }
+
+    private void passDataToTableOfContents(int i, int which,int size) {
+        if (i < size ) {
+            String[] variableNames = dataTables[which].getVariableNames();
+            outDisp[which].setyAxisSelected(i);
+            outDisp[which].setDataForGraphs(dataTables[which].getDataOfVariables(), variableNames,
+                    IndexOutVar[which], numRows[which]);
+            outDisp[which].addPlotsForInput(i, outDisp[which].getxAxisSelected());
+            showData[which].setDataSetOfContents(i);
+        }
+    }
+
+    private void createMenuBar()
+    {
+        JMenuBar menubar = new JMenuBar();
+        JMenu file = new JMenu("File");
+        JMenuItem dataMenuItem = new JMenuItem("Open Data");
+        dataMenuItem.setMnemonic(KeyEvent.VK_E);
+        JMenuItem aboutMenuItem = new JMenuItem("About");
+        aboutMenuItem.setMnemonic(KeyEvent.VK_E);
+        JMenuItem exitMenuItem = new JMenuItem("Exit");
+        exitMenuItem.setMnemonic(KeyEvent.VK_E);
+        exitMenuItem.setToolTipText("Exit application");
+        exitMenuItem.addActionListener(event -> System.exit(0));
+        file.add(dataMenuItem);
+        file.add(aboutMenuItem);
+        file.add(exitMenuItem);
+        menubar.add(file);
+        frame.setJMenuBar(menubar);
+    }
+
+    private void setupGUI(JPanel panel, int which) {
+        panel.setLayout(null);
+        Insets insets = panel.getInsets();
+        ImageIcon icon = readAnImage("openFile.png");
+        chooseFile[which] = new JButton();
+        if (icon == null) {
+            chooseFile[which].setText("Browse");
+        }
+        else {
+            chooseFile[which].setIcon(icon);
+            chooseFile[which].setPreferredSize(new Dimension(30, 30));
+            chooseFile[which].setBackground(Color.WHITE);
+            chooseFile[which].setBorderPainted(false);
+        }
+        labels[0] = new JLabel("Choose File of Data\n");
+        labels[1] = new JLabel("Target Expression");
+        labels[2] = new JLabel("Stop Criteria Fitness");
+        labels[3] = new JLabel("Evolutions");
+        labels[4] = new JLabel("Population size");
+        labels[5] = new JLabel("Max init depth");
+        labels[6] = new JLabel("Crossover depth");
+        labels[7] = new JLabel("Building Blocks");
+        labels[8] = new JLabel("Error Method");
+        labels[9] = new JLabel("Type of Equation");
+        labels[10] = new JLabel("Differential From");
+        labels[11] = new JLabel("Differential To");
+
+        for (JLabel label : labels) {
+            label.setPreferredSize(new Dimension(length, height));
+        }
+        targetFunction[which]   = new JTextField("", text_length);
+        stopCriteria[which]     = new JTextField("-1", text_length);
+        errorMethods[which]     = new JComboBox<>(errorMethodsOptions);
+        typeOfEquation[which]   = new JComboBox<>(typeOfEquations);
+        crossDepth[which]       = new JTextField("8", text_length);
+        evolve[which]           = new JTextField("1000", text_length);
+        inDepth[which]          = new JTextField("4", text_length);
+        populationSize[which]   = new JTextField("1000", text_length);
+        fileName[which]         = new JTextField("", text_length);
+        differentialFor[which]  = new JTextField("", text_length);
+        differentialTo[which]   = new JTextField("", text_length);
+
+        fileName[which].setHorizontalAlignment(SwingConstants.RIGHT);
+        stopCriteria[which].setHorizontalAlignment(SwingConstants.RIGHT);
+        targetFunction[which].setHorizontalAlignment(SwingConstants.RIGHT);
+        evolve[which].setHorizontalAlignment(SwingConstants.RIGHT);
+        crossDepth[which].setHorizontalAlignment(SwingConstants.RIGHT);
+        stopCriteria[which].setHorizontalAlignment(SwingConstants.RIGHT);
+        inDepth[which].setHorizontalAlignment(SwingConstants.RIGHT);
+        populationSize[which].setHorizontalAlignment(SwingConstants.RIGHT);
+
+        inDepth[which].setInputVerifier(verifier);
+        populationSize[which].setInputVerifier(verifier);
+        evolve[which].setInputVerifier(verifier);
+        crossDepth[which].setInputVerifier(verifier);
+        stopCriteria[which].setInputVerifier(verifier);
+        targetFunction[which].setInputVerifier(verifier);
+
+        targetFunction[which].setEditable(true);
+        stopCriteria[which].setEditable(true);
+        inDepth[which].setEditable(true);
+        populationSize[which].setEditable(true);
+        crossDepth[which].setEditable(true);
+        evolve[which].setEditable(true);
+
+        functionsTables[which] = new FunctionsTable();
+        int[] c = calculateComplexity(functionsTables[which].functionsNames, which);
+        functionsTables[which].setComplexity(c);
+        functionsTables[which].start();
+        int width  = labels[0].getPreferredSize().width;
+        int height = labels[0].getPreferredSize().height;
+        int leftLength = insets.left + left_length;
+        for (int i = 0; i < labels.length-1; i++) {
+            panel.add (labels[i]);
+            if (i>0) {
+                labels[i].setBounds(leftLength, labels[i-1].getY() + labels[i-1].getHeight(),
+                        width, height);
+            }
+            else {
+                labels[i].setBounds(leftLength, insets.top + text_length, width,
+                        height);
+            }
+        }
+        width        = labels[0].getWidth() + text_length;
+        height       = crossDepth[which].getPreferredSize().height;
+        int text_wid = stopCriteria[which].getPreferredSize().width;
+        fileName[which].setBounds (labels[0].getX() + width , insets.top + text_length, text_wid, height);
+        chooseFile[which].setBounds (fileName[which].getX()+fileName[which].getWidth(),
+                text_length - 5, 30, 30);
+        targetFunction[which].setBounds (labels[1].getX() + width, labels[1].getY(), text_wid , height);
+        stopCriteria[which].setBounds (labels[2].getX() + width, labels[2].getY(), text_wid, height);
+        evolve[which].setBounds (labels[3].getX() + width , labels[3].getY(), text_wid, height);
+        populationSize[which].setBounds (labels[4].getX() + width, labels[4].getY(), text_wid, height);
+        inDepth[which].setBounds (labels[5].getX() + width, labels[5].getY(), text_wid, height);
+        crossDepth[which].setBounds(labels[6].getX() + width, labels[6].getY(), text_wid, height);
+
+        panel.add(chooseFile[which]);
+        panel.add(inDepth[which]);
+        panel.add(evolve[which]);
+        panel.add(crossDepth[which]);
+        panel.add(populationSize[which]);
+        panel.add(targetFunction[which]);
+        panel.add(stopCriteria[which]);
+        panel.add(fileName[which]);
+        JScrollPane pane = functionsTables[which].getScrollPane();
+        pane.setBounds(labels[7].getX() +text_length , labels[7].getY()+ labels[7].getHeight(),
+                pane.getPreferredSize().width, pane.getPreferredSize().height);
+        panel.add(pane);
+
+        for (int i = 9; i < labels.length; i++) {
+            panel.add (labels[i]);
+            if (i==9) {
+                labels[i].setBounds(fileName[which].getX() + targetFunction[which].getWidth()+80, labels[0].getY(), width, height);
+
+            }
+            else {
+                labels[i].setBounds(labels[i-1].getX(), labels[i-1].getY()+labels[i-1].getHeight(), width,
+                        height);
+            }
+            panel.add(labels[i]);
+        }
+        labels[8].setBounds(labels[11].getX(), labels[11].getY()+labels[11].getHeight(), width, height);
+//        labels[8].setBounds(labels[10].getX(), pane.getPreferredSize().height+pane.getY()+5, width, height);
+        panel.add(labels[8]);
+        typeOfEquation[which].setBounds(labels[9].getX()+labels[9].getWidth(), labels[9].getY(), width, height);
+        differentialFor[which].setBounds(labels[10].getX()+labels[10].getWidth(), labels[10].getY(), width, height);
+        differentialTo[which].setBounds(labels[11].getX()+labels[11].getWidth(), labels[11].getY(), width, height);
+        errorMethods[which].setBounds(labels[8].getX()+width, labels[8].getY(), width, height);
+        panel.add(errorMethods[which]);
+        panel.add(typeOfEquation[which]);
+        panel.add(differentialFor[which]);
+        panel.add(differentialTo[which]);
+
+        chooseFile[which].addActionListener(e -> {
+            if (gen[which] == 0) {
+                String k = showFileChooserDemo(which);
+                if (k != null) {
+                    dataTables[which].resetTable();
+                    fileName[which].setText(dataFileName[which]);
+                    readFileAndAssignData(which);
+                    System.out.println("After reading functions length "+functions[which].length);
+                }
+            }
+        });
+        functions[which] = functionsTables[which].getFunctionsSelected();
+        addActionListenersToTextFields(which);
+        addActionListenesToComboBoxes(which, panel);
+        panel.revalidate();
+
+    }
+
+    void addActionListenersToTextFields(int which) {
+        targetFunction[which].getDocument().addDocumentListener(
+                new DocumentListener() {
+                    public void changedUpdate(DocumentEvent e) {
+                        warn();
+                    }
+                    public void removeUpdate(DocumentEvent e) {
+
+                        warn();
+                    }
+                    public void insertUpdate(DocumentEvent e) {
+                        warn();
+                    }
+                    void warn() {
+                        targetFunctionName[which] = targetFunction[which].getText();
+                        dataSetDisplays[which].setTargetExpresion(targetFunctionName[which]);
+                    }
+                });
+        differentialFor[which].getDocument().addDocumentListener(
+                new DocumentListener() {
+                    public void changedUpdate(DocumentEvent e) {
+                        warn();
+                    }
+                    public void removeUpdate(DocumentEvent e) {
+                        warn();
+                    }
+
+                    public void insertUpdate(DocumentEvent e) {
+                        warn();
+                    }
+                    void warn() {
+                        if (!differentialFor[which].getText().equals("")) {
+                            differentialVarFor[which] = differentialFor[which].getText();
+                        }
+                    }
+                });
+        differentialTo[which].getDocument().addDocumentListener(
+                new DocumentListener() {
+                    public void changedUpdate(DocumentEvent e) {
+                        warn();
+                    }
+                    public void removeUpdate(DocumentEvent e) {
+                        warn();
+                    }
+
+                    public void insertUpdate(DocumentEvent e) {
+                        warn();
+                    }
+                    void warn() {
+                        if (!differentialTo[which].getText().equals("")) {
+                            differentialVarTo[which] = differentialTo[which].getText();
+                        }
+                    }
+                });
+    }
+
+    private void MessagePopUp(String message) {
+        JOptionPane.showMessageDialog(null, message,
+                "Invalid data", JOptionPane.WARNING_MESSAGE);
+    }
+
+    private void addActionListenesToComboBoxes(int which, JPanel panel) {
+        errorMethods[which].addActionListener(e->{
+            methodChosen[which] = Objects.toString(errorMethods[which].getSelectedItem());
+        });
+        typeOfEquation[which].addActionListener(e->{
+            typeChosen[which] = Objects.toString(typeOfEquation[which].getSelectedItem());
+        });
+    }
+
+    private Solution createNewSolution(IGPProgram fittest, int which) {
+        Solution eachSolution;
+        int complex                 = eq[which].getComplexity(fittest);
+        double error                = eq[which].getError(fittest);
+        double minError             = eq[which].getMinError(fittest);
+        double maxError             = eq[which].getMaxError(fittest);
+        double meanError            = eq[which].getMeanError(fittest);
+        double medianError          = eq[which].getMedianError(fittest);
+        double totalError           = eq[which].getTotalError(fittest);
+        double correlation          = eq[which].getCorrelation(fittest);
+        double[][] data             = transformData(eq[which].getData());
+        int numHits                 = eq[which].getNumHits(fittest);
+        String sol                  = eq[which].getStringProgram(fittest);
+        double[] calculatedResults  = eq[which].computeSolution(fittest, data);
+        String[] variableNames      = dataTables[which].getVariableNames();
+        fitness[which] = eq[which].getFitnessVale(fittest);
+        System.out.println("3!@#$%^&()_)($#@@#$%^&*())(*&^%$#    "+(stopCriteriaFitness[which] >= 0 )+ " " +(fitness[which] <= stopCriteriaFitness[which]));
+        if (stopCriteriaFitness[which] >= 0 && fitness[which] <= stopCriteriaFitness[which]) {
+            System.out.println("^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ "+fitness[which]);
+            stop[which] = true;
+        }
+            eachSolution =  new Solution(sol, complex, error, IndexOutVar[which],
+                variableNames, data, calculatedResults, correlation,
+                numHits, minError, maxError, meanError, medianError, totalError);
+        return eachSolution;
+    }
+
+    private double[][] createTableOfOutputData(int which) {
+        List<Solution> sol = dataSetDisplays[which].getSolutions();
+        int rows = dataSetDisplays[which].getNumRows();
+        int columns = dataSetDisplays[which].getVariableNames().length;
+        int totalColumns = columns + sol.size();
+        double[][] dataForEquation = dataTables[which].getDataOfVariables();
+        double[][] table = new double[totalColumns][rows];
+        System.out.println("rows of data "+ rows+ " columns "+columns + " in panel "+which);
+        System.out.println("data rows "+ dataForEquation[0].length+ " columns "+dataForEquation.length + " in panel "+which);
+        for (int i = 0; i < columns; i++) {
+            for (int j = 0; j < rows; j++) {
+                table[i][j] = dataForEquation[i][j];
+            }
+        }
+        for (int j = columns; j < totalColumns; j++) {
+            table[j] = sol.get(j - columns).getdata();
+        }
+        return table;
+    }
+
+    private String showFileChooserDemo(int which) {
+        final JFileChooser  fileDialog = new JFileChooser();
+        int returnVal = fileDialog.showOpenDialog(frame);
+        try {
+            if (returnVal == JFileChooser.APPROVE_OPTION) {
+                String file         = fileDialog.getSelectedFile().getPath();
+                dataFilePath[which] = file;
+                dataFileName[which] = fileDialog.getSelectedFile().getName();
+                return  file;
+            }
+            else return null;
+        }
+        catch (Exception e) {
+            return null;
+        }
+    }
+
+    private double[][] transformData(Double[][] d) {
+        int r = d.length;
+        int c = d[0].length;
+        double[][] dataNeeded = new double[r][c];
+        for (int i = 0; i < r; ++i) {
+            for(int j = 0; j < c; ++j){
+                dataNeeded[i][j] = Double.valueOf(d[i][j]);
+            }
+        }
+        return  dataNeeded;
+    }
+
+    private void readFileAndAssignData(int which) {
+        if (doInBackground(which)) {
+            done(which);
+        }
+    }
+
+    private boolean doInBackground(int which) {
+        dataSetDisplays[which] = null;
+        try {
+            dataSetForCalculations = readFile(dataFilePath[which], which);
+            if (dataSetForCalculations == null) {
+                JOptionPane.showMessageDialog(null, //no owner frame
+                        "File has a unknown characters or no file was chosen", //text to display
+                        "Invalid File", //title
+                        JOptionPane.WARNING_MESSAGE);
+                return false;
+            }
+//            functions[which] = eq[which].getFunctions();
+            dataSet = transformData(dataSetForCalculations);
+            numRows[which] = dataSetForCalculations[0].length;
+//            System.out.println("!&&&&&&&&&&&&&&&&&&&&&");
+            dataSetDisplays[which] = new DataSetDisplay(IndexOutVar[which], variableNames[which], dataSet);
+        } catch (Exception e) {
+            MessagePopUp("Error in reading file, try another file.");
+        }
+        return true;
+    }
+
+    private void done(int which) {
+        try {
+            if (dataSetForCalculations != null) {
+                varDisp[which].clearPreviousData();
+                varDisp[which].setDataForGraphs(dataSet, variableNames[which],
+                        IndexOutVar[which], numRows[which]);
+                outDisp[which].setIndexOfFirstSolution(variableNames[which].length);
+                dataTables[which].setDataToTable(dataSet, variableNames[which], numRows[which]);
+               System.out.println("seeting out displ");
+                outDisp[which].setDataForGraphs(dataSet, variableNames[which],
+                       IndexOutVar[which], numRows[which]);
+            }
+            else {
+                MessagePopUp("While reading file something wrong occured no data where returned");
+            }
+        }
+        catch (Exception e) {
+            MessagePopUp("Error at retrieving data from file "+ e);
+        }
+    }
+
+    private Double[][] readFile(String file, int which) {
+        Double[][] data = null;
+        try {
+            BufferedReader inr;
+            try {
+                inr = new BufferedReader(new FileReader(file));
+            }
+            catch (Exception e) {
+//                System.out.println("could not read file "+e);
+                return null;
+            }
+            String str;
+            int lineCount = 0;
+            boolean gotData = false;
+            ArrayList<Double[]> theData = new ArrayList<Double[]>();
+            ArrayList<Double[]> theValidationSet = new ArrayList<Double[]>();
+            // contains user defined testdata
+            ArrayList<Double[]> theTestData = new ArrayList<Double[]>();
+            // read the lines
+            while ((str = inr.readLine()) != null) {
+                lineCount++;
+                str = str.trim();
+                // ignore empty lines or comments, i.e. lines starting with either # or %
+                // ----------------------------------------------------------------------
+                if(str.startsWith("#") || str.startsWith("%") || str.length() == 0) {
+                    continue;
+                }
+                if ("data".equals(str)) {
+                    gotData = true;
+                    continue;
+                }
+                if (gotData) {
+                    // Read the data rows
+                    // ------------------
+                    String[] dataRowStr = str.split("[\\s,]+");
+                    int len = dataRowStr.length;
+                    Double[] dataRow = new Double[len];
+                    boolean isTestData = false;
+                    for (int i = 0; i < len; i++) {
+                        if ("?".equals(dataRowStr[i])) {
+                            isTestData = true;
+                            dataRow[i] = -1.0d; // dummy value
+                        } else {
+                            dataRow[i] = Double.parseDouble(dataRowStr[i]);
+                        }
+                    }
+                    // check if this row should be in the data
+                    // or maybe in the validation set.
+                    // A data point may not be in the both data
+                    // set and validation set.
+                    boolean inData = true;
+                    if (isTestData) {
+                        inData = false;
+                        theTestData.add(dataRow);
+                    }
+                    // put in the data set
+                    if (inData) {
+                        theData.add(dataRow);
+                    }
+                } else {
+                    // Check for parameters on the form
+                    //    parameter: value(s)
+                    // --------------------------------
+                    if(str.contains(":")) {
+                        String row[] = str.split(":\\s*");
+                        if ("max_init_depth".equals(row[0])) {
+                            initDepth[which] = Integer.parseInt(row[1]);
+                        } else if ("population_size".equals(row[0])) {
+                            popSize[which] = Integer.parseInt(row[1]);
+                        } else if ("num_evolutions".equals(row[0])) {
+                            evolutions[which] = Integer.parseInt(row[1]);
+                        } else if ("functions".equals(row[0])) {
+                            functions[which] = row[1].split("[\\s,]+");
+                            System.out.println("functions from file " +functions[which].length);
+                        } else if ("variable_names".equals(row[0])) {
+                            variableNames[which] = row[1].split("[\\s,]+");
+                        } else if ("output_variable".equals(row[0])) {
+                            outputVariable = Integer.parseInt(row[1]);
+                            IndexOutVar[which] = outputVariable;
+                        } else {
+                            System.out.println("Unknown keyword: " + row[0] + " on line " + lineCount);
+                        }
+                    }
+                }
+
+            } // end while
+            inr.close();
+            // Now we know everything to be known.
+            // Construct the matrix from the file.
+            // -----------------------------------
+            int r = theData.size();
+            int c = theData.get(0).length;
+            Double[][] dataTmp = new Double[r][c];
+            for(int i = 0; i < r; i++) {
+                Double[] this_row = theData.get(i);
+                for(int j = 0; j < c; j++) {
+                    dataTmp[i][j] = this_row[j];
+                }
+            }
+            // Since we calculate the error on the variable we
+            // must transpose the data matrix
+            // -----------------------------------------------
+            data = transposeMatrix(dataTmp);
+            numRows[which] = data[0].length;
+        } catch (IOException e) {
+            System.out.println(e);
+            System.exit(1);
+        }
+        if (outputVariable==null) {
+            outputVariable = data.length-1;
+            IndexOutVar[which] = outputVariable;
+        }
+        return data;
+    } // end readFile
+
+    private void setUpFormats() {
+        integerFormat = NumberFormat.getIntegerInstance();
+    }
+
+    private void setEditorForEquations() {
+        editor.addStandardFunctions();
+        editor.addComplex();
+        editor.setAllowUndeclared(true);
+        editor.setImplicitMul(true);
+        editor.setAllowAssignment(true);
+    }
+
+    private String editSolution(String equation) {
+        try {
+            Node node = editor.parse(equation);
+            Node processed = editor.preprocess(node);
+            Node simp = editor.simplify(processed);
+            equation = editor.toString(simp);
+        } catch (org.nfunk.jep.ParseException e) {}
+        return  equation;
+    }
+
+    public class MyVerifier extends InputVerifier
+            implements ActionListener {
+        String message = null;
+
+        public boolean shouldYieldFocus(JComponent input) {
+            boolean inputOK = verify(input);
+            makeItPretty(input);
+            if (inputOK) {
+                return true;
+            }
+
+            //Pop up the message dialog.
+            message += ".\nPlease try again.";
+            JOptionPane.showMessageDialog(null, //no owner frame
+                    message, //text to display
+                    "Invalid Value",
+                    JOptionPane.WARNING_MESSAGE);
+
+            //Reinstall the input verifier.
+            input.setInputVerifier(this);
+
+            //Beep and by returning false it means that we don't
+            //want to yield focus.
+            Toolkit.getDefaultToolkit().beep();
+            return false;
+        }
+
+        //This method checks input, but should cause no side effects.
+        public boolean verify(JComponent input) {
+            return checkField(input, false);
+        }
+
+        private void makeItPretty(JComponent input) {
+            checkField(input, true);
+        }
+
+        private boolean checkField(JComponent input, boolean changeIt) {
+            for (int i = 0; i < numberOfEquations; i++) {
+                if (input == inDepth[i] && !inDepth[i].getText().equals("0")) {
+                    return checkAmountField(inDepth[i], changeIt, MIN_INIT, MAX_INIT, " initial depth ", i);
+                } else if(input == populationSize[i] && !populationSize[i].getText().equals("0")) {
+                    return checkAmountField(populationSize[i], changeIt, MIN_POPULATION,
+                            MAX_POPULATION, " the population ", i);
+                } else if(input == evolve[i] && !evolve[i].getText().equals("0")) {
+                    return checkAmountField(evolve[i], changeIt, MIN_GENERATIONS, MAX_GENERATIONS,
+                            " the generation ", i);
+                } else if(input == crossDepth[i] && !crossDepth[i].getText().equals("0")) {
+                    return checkAmountField(crossDepth[i], changeIt, MIN_CROSSOVER, MAX_CROSSOVER,
+                            " max crossover depth ", i);
+                }
+                else if(input ==  stopCriteria[i]) {
+                    return checkAmountField(stopCriteria[i], changeIt, -1, MAX_CROSSOVER,
+                            " stop criteria fitness ", i);
+                }
+            }
+            return (input != equations) || checkAmountField(equations, changeIt, 1, 5, "number of equations", 0);
+        }
+
+        //Checks that the amount field is valid.  If it is valid. it returns true,
+        // else it sets the message field and returns false.  If the change argument
+        // is true,  set the textField to the parsed number so that it looks good
+        private boolean checkAmountField(JTextField input, boolean change, int min, int max, String Message, int i) {
+            boolean wasValid = true;
+            double amount;
+            //Parse the value.
+            try {
+                amount = integerFormat.parse(input.getText()).doubleValue();
+            } catch (ParseException pe) {
+                message = "Invalid format in"+ Message+" field";
+                return false;
+            }
+
+            //Value was invalid.
+            if ((amount < min) || (amount > max)) {
+                wasValid = false;
+                if (amount < min) {
+                    message = Message +" has to be >= "
+                            + integerFormat.format(min);
+                } else { //amount is greater than MAX_AMOUNT
+                    message = Message+" has to be =< "
+                            + integerFormat.format(max);
+                }
+                return false;
+            }
+            //Whether value was valid or not, format it nicely.
+            addTextToFieldAfterVerifier(input, i);
+            return wasValid;
+        }
+
+        public void actionPerformed(ActionEvent e) {
+            JTextField source = (JTextField)e.getSource();
+            shouldYieldFocus(source); //ignore return value
+            source.selectAll();
+        }
+
+        private void addTextToFieldAfterVerifier(JTextField input, int which) {
+            if (input == evolve[which]) {
+                evolutions[which] = Integer.parseInt(evolve[which].getText());
+            }
+            if (input == populationSize[which]) {
+                popSize[which] = Integer.parseInt(populationSize[which].getText());
+            }
+            if (input == crossDepth[which]) {
+                crossoverDepth[which] = Integer.parseInt(crossDepth[which].getText());
+            }
+            if (input == inDepth[which]) {
+                initDepth[which] = Integer.parseInt(inDepth[which].getText());
+            }
+            if (input == stopCriteria[which]) {
+                stopCriteriaFitness[which] = Double.parseDouble(stopCriteria[which].getText());
+            }
+        }
+
+    }
+
+}

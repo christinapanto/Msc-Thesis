@@ -1,0 +1,6 @@
+
+Polynomial -> Term;
+Polynomial -> Polynomial + Term;
+
+Term -> const[_:-1000:0.1:1000];
+Term -> Term * V;

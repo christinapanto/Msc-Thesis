@@ -1,0 +1,59 @@
+Data files: examples/data/baskball.data
+Variables: assists_per_minute height time_played age points_per_minute
+Data length: 96
+
+Grammar definition file: /Users/christinapantopoli/Desktop/lagramge-1.2r/lib/polynomial.gramm
+Grammar:
+Polynomial -> Term | Polynomial + Term;
+Term -> const[_:-1000:0.1:1000] | Term * V;
+
+Equation type: ordinary explicit (assists_per_minute)
+Maximal parse tree depth: 5
+Atom Polynomial:
+depth    #p.trees    max.len.    min.len.     #consts    der.len.
+    0           0          -1          -1          -1          -1
+    1           0          -1          -1          -1           0
+    2           1           1           1           1           2
+    3          10           5           3           2           6
+    4         231          11           5           3          12
+    5       19720          19           7           4          20
+
+
+Search strategy: exhaustive
+Stopping criterion: none
+Search heuristic: sum of squared errors
+
+Restarts of parameter estimation methods: 0
+Verbose: off
+
+19720 parse trees evaluated
+
+
+Best equations:
+assists_per_minute = 0.1 * points_per_minute + 0.1 {MSE = 0.00429973, MDL = 0.00449169}
+assists_per_minute = 0.1 + 0.1 * points_per_minute {MSE = 0.00429973, MDL = 0.00449169}
+assists_per_minute = 0.1 + 0.1 * points_per_minute + 0.1 * points_per_minute * points_per_minute * points_per_minute {MSE = 0.00442276, MDL = 0.00492184}
+assists_per_minute = 0.1 * points_per_minute + 0.1 + 0.1 * points_per_minute * points_per_minute * points_per_minute {MSE = 0.00442276, MDL = 0.00492184}
+assists_per_minute = 0.1 + 0.1 * points_per_minute + 0.1 * points_per_minute * points_per_minute {MSE = 0.00448772, MDL = 0.00491002}
+assists_per_minute = 0.1 * points_per_minute + 0.1 * points_per_minute * points_per_minute + 0.1 {MSE = 0.00448772, MDL = 0.00491002}
+assists_per_minute = 0.1 + 0.1 * points_per_minute * points_per_minute + 0.1 * points_per_minute {MSE = 0.00448772, MDL = 0.00491002}
+assists_per_minute = 0.1 * points_per_minute + 0.1 + 0.1 * points_per_minute * points_per_minute {MSE = 0.00448772, MDL = 0.00491002}
+assists_per_minute = 0.1 + 0.1 * points_per_minute * points_per_minute + 0.1 * points_per_minute * points_per_minute {MSE = 0.00498934, MDL = 0.00548842}
+assists_per_minute = 0.1 + 0.1 {MSE = 0.00503655, MDL = 0.00515172}
+assists_per_minute = 0.1 + 0.1 * points_per_minute + 0.1 * points_per_minute {MSE = 0.00507226, MDL = 0.00541778}
+assists_per_minute = 0.1 * points_per_minute + 0.1 + 0.1 * points_per_minute {MSE = 0.00507226, MDL = 0.00541778}
+assists_per_minute = 0.1 * points_per_minute + 0.1 * points_per_minute + 0.1 {MSE = 0.00507226, MDL = 0.00541778}
+assists_per_minute = 0.1 + 0.1 * points_per_minute + 0.1 * points_per_minute * points_per_minute + 0.1 * points_per_minute * points_per_minute * points_per_minute {MSE = 0.00509152, MDL = 0.00582095}
+assists_per_minute = 0.1 + 0.1 * points_per_minute * points_per_minute + 0.1 * points_per_minute * points_per_minute * points_per_minute {MSE = 0.00539271, MDL = 0.00596857}
+assists_per_minute = 0.1 + 0.1 * points_per_minute + 0.1 * points_per_minute * points_per_minute + 0.1 * points_per_minute * points_per_minute {MSE = 0.00557763, MDL = 0.00623027}
+assists_per_minute = 0.1 + 0.1 * points_per_minute * points_per_minute {MSE = 0.00569084, MDL = 0.00595957}
+assists_per_minute = 0.1 * points_per_minute * points_per_minute + 0.1 {MSE = 0.00569084, MDL = 0.00595957}
+assists_per_minute = 0.1 + 0.1 + 0.1 * points_per_minute * points_per_minute * points_per_minute {MSE = 0.00604906, MDL = 0.00647136}
+assists_per_minute = 0.1 + 0.1 * points_per_minute + 0.1 * points_per_minute + 0.1 * points_per_minute * points_per_minute * points_per_minute {MSE = 0.00609722, MDL = 0.00674987}
+assists_per_minute = 0.1 + 0.1 * points_per_minute * points_per_minute * points_per_minute {MSE = 0.00651536, MDL = 0.00686088}
+assists_per_minute = 0.1 * points_per_minute + 0.1 * points_per_minute + 0.1 * points_per_minute {MSE = 0.0066535, MDL = 0.0070758}
+assists_per_minute = 0.1 + 0.1 * points_per_minute + 0.1 * points_per_minute + 0.1 * points_per_minute * points_per_minute {MSE = 0.00705166, MDL = 0.00762752}
+assists_per_minute = 0.1 + 0.1 * points_per_minute + 0.1 * points_per_minute * points_per_minute + 0.1 * points_per_minute {MSE = 0.00705166, MDL = 0.00762752}
+assists_per_minute = 0.1 + 0.1 + 0.1 * points_per_minute * points_per_minute {MSE = 0.00720018, MDL = 0.0075457}
+
+Time elapsed: 1.16 [s]

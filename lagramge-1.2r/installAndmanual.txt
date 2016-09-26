@@ -1,0 +1,19 @@
+﻿LAGRAMGE INSTALL
+
+There is an install file in the files given but additionally some other steps have to be taken into account.
+
+
+1) As said in the manual the system had to have lex/yacc packages and gfortran package and it should be able to compile gcc. In my case I am using clang.
+
+2) In the makefile change the DHOME_DIR variable to the directory where the lagrange files are and in addition I changed the CC from gcc to clang, the -lfl flags to -ll and for g: $(OBJECTS1) I added the path of where the gfortran library is as it could not find it when I compiled and it should be something similar to this 
+g: $(OBJECTS1)
+	$(CC) -o $@ $(OBJECTS1) $(OBJECTS_ALG_717) -ll -lm -ldl -L/usr/local/gfortran/lib -lgfortran 
+Also in the make file where the -shared flag is used it needs to be replaced with -dylib
+	
+3) Additionally in all the source files I changed the malloc.h library to malloc/malloc.h.
+
+4) In the file  rgramm.y add as line 22: void function_def(char *ls, int ord);
+
+
+After these changes if you follow the instruction numer 3 in the install.txt and copy and paste the gc, rg, g files from the src in the bin directory the example given in the manual.txt should work however when you run ./bin/g the first flag should be -g and not -l as insructed int he manual.txt
+

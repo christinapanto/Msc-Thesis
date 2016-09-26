@@ -1,0 +1,5 @@
+double If(double v, double e1, double e2) {
+	return ((v > 0) ? e1:e2);
+}
+IfE -> E|If(v, E, E)
+E-> const|const*v|E+const*v
